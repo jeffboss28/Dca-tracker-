@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>DCA Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #242424;
+  --border: #2e2e2e; --border2: #3a3a3a;
+  --text: #f0f0f0; --text2: #888; --text3: #555;
+  --green: #00d17a; --red: #ff4d4d;
+  --accent: #f7931a; --accent-bg: rgba(247,147,26,0.1);
+  --radius: 10px; --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+body { padding-bottom: 80px; }
+.header { padding: 1.2rem 1rem 0.8rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 10; }
+.header-title { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--accent); letter-spacing: 0.08em; }
+.header-sub { font-size: 12px; color: var(--text3); font-family: 'DM Mono', monospace; }
+.header-user { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-align: right; }
+.btn-logout { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; background: none; border: none; cursor: pointer; padding: 2px 0; display: block; }
+.chips-wrap { padding: 0.75rem 1rem; display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+.chips-wrap::-webkit-scrollbar { display: none; }
+.chip { flex-shrink: 0; padding: 5px 14px; border: 1px solid var(--border2); border-radius: 20px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); cursor: pointer; background: transparent; transition: all 0.15s; }
+.chip.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 1px solid var(--border); display: flex; z-index: 10; }
+.nav-btn { flex: 1; padding: 12px 4px 10px; border: none; background: transparent; color: var(--text3); font-size: 10px; font-family: 'DM Sans', sans-serif; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: color 0.15s; }
+.nav-btn.active { color: var(--accent); }
+.nav-icon { font-size: 18px; line-height: 1; }
+.content { padding: 1rem; max-width: 500px; margin: 0 auto; }
+.section { display: none; }
+.section.visible { display: block; }
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.85rem; }
+.card-title { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.field { margin-bottom: 10px; }
+.field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-family: 'DM Mono', monospace; }
+.field input { width: 100%; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text); font-family: 'DM Sans', sans-serif; outline: none; -webkit-appearance: none; transition: border-color 0.15s; }
+.field input:focus { border-color: var(--border2); }
+.field input::placeholder { color: var(--text3); }
+.half { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.price-row { display: flex; gap: 6px; }
+.price-row input { flex: 1; }
+.btn-main { width: 100%; padding: 12px; background: var(--accent-bg); border: 1px solid var(--accent); border-radius: var(--radius-sm); color: var(--accent); font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; }
+.btn-main:active { transform: scale(0.98); opacity: 0.8; }
+.btn-sm { padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text2); font-size: 12px; font-family: 'DM Mono', monospace; cursor: pointer; white-space: nowrap; }
+.btn-del { background: transparent; border: none; color: var(--text3); cursor: pointer; font-size: 16px; padding: 4px 6px; line-height: 1; }
+.btn-export { width: 100%; padding: 11px; background: transparent; border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text2); font-size: 13px; font-family: 'DM Mono', monospace; cursor: pointer; margin-bottom: 8px; }
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0.85rem; }
+.metric { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.metric-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 5px; }
+.metric-value { font-size: 17px; font-weight: 500; color: var(--text); font-family: 'DM Mono', monospace; word-break: break-all; }
+.metric-value.green { color: var(--green); }
+.metric-value.red { color: var(--red); }
+.metric-value.accent { color: var(--accent); }
+.entry { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.entry:last-of-type { border-bottom: none; }
+.entry-date { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 3px; }
+.entry-main { font-size: 15px; font-weight: 500; color: var(--text); }
+.entry-sub { font-size: 12px; color: var(--text2); margin-top: 2px; font-family: 'DM Mono', monospace; }
+.entry-pnl { font-size: 12px; font-weight: 500; margin-top: 3px; font-family: 'DM Mono', monospace; }
+.entry-pnl.green { color: var(--green); }
+.entry-pnl.red { color: var(--red); }
+.empty { text-align: center; padding: 2rem 1rem; color: var(--text3); font-size: 13px; font-family: 'DM Mono', monospace; }
+.price-card { background: var(--bg2); border: 1px solid var(--accent); border-radius: var(--radius); padding: 0.85rem 1rem; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.price-card input { flex: 1; background: transparent; border: none; font-size: 20px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--accent); outline: none; min-width: 0; }
+.price-card input::placeholder { color: rgba(247,147,26,0.3); }
+.price-card-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table td { padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.detail-table tr:last-child td { border-bottom: none; }
+.detail-table td:first-child { color: var(--text2); font-family: 'DM Mono', monospace; font-size: 11px; }
+.detail-table td:last-child { text-align: right; font-weight: 500; font-family: 'DM Mono', monospace; }
+.crypto-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.crypto-item:last-of-type { border-bottom: none; }
+.crypto-symbol { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--accent); }
+.crypto-name { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.add-row { display: flex; gap: 6px; margin-top: 12px; }
+.add-row input { flex: 1; padding: 9px 11px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--text); font-family: 'DM Mono', monospace; outline: none; }
+.add-row input::placeholder { color: var(--text3); }
+.toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 20px; font-size: 13px; font-family: 'DM Mono', monospace; color: var(--text); opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 100; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#auth-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+.auth-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; width: 100%; max-width: 360px; }
+.auth-title { font-family: 'DM Mono', monospace; font-size: 20px; color: var(--accent); margin-bottom: 4px; }
+.auth-sub { font-size: 13px; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 1.5rem; }
+.auth-field { margin-bottom: 12px; }
+.auth-field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-family: 'DM Mono', monospace; }
+.auth-field input { width: 100%; padding: 11px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text); outline: none; }
+.auth-field input:focus { border-color: var(--border2); }
+.auth-field input::placeholder { color: var(--text3); }
+.auth-btn { width: 100%; padding: 12px; background: var(--accent-bg); border: 1px solid var(--accent); border-radius: var(--radius-sm); color: var(--accent); font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 4px; font-family: 'DM Sans', sans-serif; }
+.auth-switch { text-align: center; margin-top: 1rem; font-size: 13px; color: var(--text3); font-family: 'DM Mono', monospace; }
+.auth-switch span { color: var(--accent); cursor: pointer; }
+.auth-error { font-size: 12px; color: var(--red); font-family: 'DM Mono', monospace; margin-top: 8px; min-height: 16px; }
+.loading { text-align: center; padding: 3rem; color: var(--text3); font-family: 'DM Mono', monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div id="loading-screen" class="loading">cargando...</div>
+
+<div id="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-title">DCA TRACKER</div>
+    <div class="auth-sub">jeffboss</div>
+    <div id="auth-login">
+      <div class="auth-field"><label>email</label><input type="email" id="login-email" placeholder="tu@email.com"></div>
+      <div class="auth-field"><label>contraseña</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+      <div class="auth-error" id="login-error"></div>
+      <button class="auth-btn" onclick="doLogin()">entrar</button>
+      <div class="auth-switch">¿no tienes cuenta? <span onclick="showRegister()">regístrate</span></div>
+    </div>
+    <div id="auth-register" style="display:none">
+      <div class="auth-field"><label>email</label><input type="email" id="reg-email" placeholder="tu@email.com"></div>
+      <div class="auth-field"><label>contraseña</label><input type="password" id="reg-pass" placeholder="mínimo 6 caracteres"></div>
+      <div class="auth-error" id="reg-error"></div>
+      <button class="auth-btn" onclick="doRegister()">crear cuenta</button>
+      <div class="auth-switch">¿ya tienes cuenta? <span onclick="showLogin()">inicia sesión</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="app-screen" style="display:none">
+  <div class="header">
+    <div><div class="header-title">DCA TRACKER</div><div class="header-sub">jeffboss</div></div>
+    <div class="header-user">
+      <div id="user-email"></div>
+      <button class="btn-logout" onclick="doLogout()">cerrar sesión</button>
+    </div>
+  </div>
+  <div class="chips-wrap" id="cripto-chips"></div>
+  <div class="content">
+    <div class="section visible" id="sec-registrar">
+      <div class="price-card">
+        <div>
+          <div class="price-card-label" id="price-label">precio actual BTC</div>
+          <input type="number" id="precio-actual" placeholder="0.00" step="0.01" oninput="savePriceInput()">
+        </div>
+        <button class="btn-sm" onclick="fetchCurrentPrice()">&#8635; live</button>
+      </div>
+      <div class="card">
+        <div class="card-title">nueva compra</div>
+        <div class="field"><label>fecha</label><input type="date" id="r-fecha"></div>
+        <div class="half">
+          <div class="field"><label>USD gastados</label><input type="number" id="r-usd" placeholder="100" step="0.01" min="0"></div>
+          <div class="field"><label>precio COP</label><input type="number" id="r-cop" placeholder="opcional" step="1" min="0"></div>
+        </div>
+        <div class="field">
+          <label>precio <span id="r-sym-label">BTC</span> en compra (USD)</label>
+          <div class="price-row">
+            <input type="number" id="r-precio" placeholder="85000" step="0.01" min="0">
+            <button class="btn-sm" onclick="useLivePrice()">usar actual</button>
+          </div>
+        </div>
+        <div class="field"><label>satoshis recibidos</label><input type="number" id="r-sats" placeholder="ej: 118000" step="1" min="0"></div>
+        <div class="field"><label>nota</label><input type="text" id="r-nota" placeholder="compra mensual..." maxlength="60"></div>
+        <button class="btn-main" onclick="addCompra()">+ registrar compra</button>
+      </div>
+    </div>
+    <div class="section" id="sec-historial">
+      <div class="card">
+        <div class="card-title">compras — <span id="hist-sym">BTC</span></div>
+        <div id="list-compras"><div class="empty">sin compras registradas.</div></div>
+      </div>
+    </div>
+    <div class="section" id="sec-ventas">
+      <div class="card">
+        <div class="card-title">nueva venta estratégica</div>
+        <div class="field"><label>fecha</label><input type="date" id="v-fecha"></div>
+        <div class="half">
+          <div class="field"><label>tokens vendidos</label><input type="number" id="v-cant" placeholder="0.05" step="any" min="0"></div>
+          <div class="field"><label>% del saldo</label><input type="number" id="v-pct" placeholder="50" step="0.01" min="0" max="100" oninput="calcVentaCant()"></div>
+        </div>
+        <div class="field"><label>precio en venta (USD)</label><input type="number" id="v-precio" placeholder="90000" step="0.01" min="0"></div>
+        <div class="field"><label>nota</label><input type="text" id="v-nota" placeholder="take profit parcial..." maxlength="60"></div>
+        <button class="btn-main" onclick="addVenta()">+ registrar venta</button>
+      </div>
+      <div class="card">
+        <div class="card-title">historial ventas — <span id="venta-sym">BTC</span></div>
+        <div id="list-ventas"><div class="empty">sin ventas registradas.</div></div>
+      </div>
+    </div>
+    <div class="section" id="sec-resumen">
+      <div id="metrics-grid" class="metrics"></div>
+      <div class="card" id="resumen-detail"></div>
+      <button class="btn-export" onclick="exportCSV()">&#8595; exportar CSV</button>
+    </div>
+    <div class="section" id="sec-config">
+      <div class="card">
+        <div class="card-title">criptomonedas</div>
+        <div id="list-cryptos"></div>
+        <div class="add-row">
+          <input type="text" id="new-symbol" placeholder="BTC" maxlength="10" style="text-transform:uppercase;max-width:90px">
+          <input type="text" id="new-name" placeholder="nombre (ej: Bitcoin)" maxlength="20">
+          <button class="btn-sm" onclick="addCrypto()">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="showSection('registrar',this)"><span class="nav-icon">+</span><span>Registrar</span></button>
+    <button class="nav-btn" onclick="showSection('historial',this)"><span class="nav-icon">&#9776;</span><span>Historial</span></button>
+    <button class="nav-btn" onclick="showSection('ventas',this)"><span class="nav-icon">&#8593;</span><span>Ventas</span></button>
+    <button class="nav-btn" onclick="showSection('resumen',this)"><span class="nav-icon">&#9650;</span><span>Resumen</span></button>
+    <button class="nav-btn" onclick="showSection('config',this)"><span class="nav-icon">&#9965;</span><span>Criptos</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://vwlabuxgyaoazhrlodnn.supabase.co';
+const SUPABASE_KEY ='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3bGFidXhneWFvYXpocmxvZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MzMzODAsImV4cCI6MjA5MjEwOTM4MH0.3hr6E8k4MYe_z4ECXGshg_r6x7OBT8grJpGL79_ETaA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let activeCrypto = 'BTC';
+let activeSection = 'registrar';
+let localPrices = {};
+let cryptos = ['BTC','XRP','WLD'];
+let cryptoNames = {BTC:'Bitcoin', XRP:'Ripple', WLD:'Worldcoin'};
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+function fmt(n, d=2) { if (isNaN(n)||n===null) return '—'; return Number(n).toLocaleString('es-CO',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtU(n, d=2) { return '$'+fmt(n,d); }
+
+function showLogin() { document.getElementById('auth-login').style.display=''; document.getElementById('auth-register').style.display='none'; }
+function showRegister() { document.getElementById('auth-login').style.display='none'; document.getElementById('auth-register').style.display=''; }
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  document.getElementById('login-error').textContent='';
+  const {error} = await sb.auth.signInWithPassword({email, password:pass});
+  if (error) document.getElementById('login-error').textContent='Email o contraseña incorrectos.';
+}
+
+async function doRegister() {
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  document.getElementById('reg-error').textContent='';
+  if (pass.length<6) { document.getElementById('reg-error').textContent='Mínimo 6 caracteres.'; return; }
+  const {error} = await sb.auth.signUp({email, password:pass});
+  if (error) document.getElementById('reg-error').textContent=error.message;
+  else { document.getElementById('reg-error').style.color='var(--green)'; document.getElementById('reg-error').textContent='Revisa tu email para confirmar.'; }
+}
+
+async function doLogout() { await sb.auth.signOut(); }
+
+function showApp(user) {
+  currentUser = user;
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='';
+  document.getElementById('user-email').textContent=user.email;
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('r-fecha').value=today;
+  document.getElementById('v-fecha').value=today;
+  loadCryptos();
+}
+
+function showAuthScreen() {
+  currentUser=null;
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+
+function loadCryptos() {
+  try {
+    const stored = localStorage.getItem('dca_cryptos_'+currentUser.id);
+    if (stored) { const p=JSON.parse(stored); cryptos=p.cryptos; cryptoNames=p.names; }
+  } catch(e){}
+  renderChips(); selectCrypto(activeCrypto);
+}
+
+function saveCryptos() {
+  try { localStorage.setItem('dca_cryptos_'+currentUser.id, JSON.stringify({cryptos,names:cryptoNames})); } catch(e){}
+}
+
+function savePriceInput() {
+  const v=parseFloat(document.getElementById('precio-actual').value);
+  if (v>0) localPrices[activeCrypto]=v;
+  if (activeSection==='resumen') renderResumen();
+  if (activeSection==='historial') renderHistorial();
+}
+
+function updatePriceDisplay() {
+  const p=localPrices[activeCrypto]||0;
+  document.getElementById('precio-actual').value=p?p.toFixed(2):'';
+}
+
+function fetchCurrentPrice() {
+  fetch('https://api.coinbase.com/v2/prices/'+activeCrypto+'-USD/spot')
+    .then(r=>r.json()).then(d=>{
+      const p=parseFloat(d.data.amount);
+      localPrices[activeCrypto]=p; updatePriceDisplay();
+      if (activeSection==='resumen') renderResumen();
+      if (activeSection==='historial') renderHistorial();
+      toast('Precio actualizado: '+fmtU(p));
+    }).catch(()=>toast('No se pudo obtener el precio.'));
+}
+
+function useLivePrice() {
+  const p=localPrices[activeCrypto];
+  if (p) document.getElementById('r-precio').value=p.toFixed(2);
+  else toast('Obtén el precio actual primero.');
+}
+
+function renderChips() {
+  document.getElementById('cripto-chips').innerHTML=cryptos.map(c=>
+    `<div class="chip${c===activeCrypto?' active':''}" onclick="selectCrypto('${c}')">${c}</div>`
+  ).join('');
+}
+
+function selectCrypto(c) {
+  activeCrypto=c; renderChips(); updatePriceDisplay();
+  document.getElementById('r-sym-label').textContent=c;
+  document.getElementById('hist-sym').textContent=c;
+  document.getElementById('venta-sym').textContent=c;
+  document.getElementById('price-label').textContent='precio actual '+c;
+  if (activeSection==='historial') renderHistorial();
+  if (activeSection==='ventas') renderVentas();
+  if (activeSection==='resumen') renderResumen();
+}
+
+function showSection(s,btn) {
+  activeSection=s;
+  document.querySelectorAll('.section').forEach(x=>x.classList.remove('visible'));
+  document.getElementById('sec-'+s).classList.add('visible');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (s==='historial') renderHistorial();
+  if (s==='ventas') renderVentas();
+  if (s==='resumen') renderResumen();
+  if (s==='config') renderConfig();
+}
+
+async function addCompra() {
+  const fecha=document.getElementById('r-fecha').value;
+  const usd=parseFloat(document.getElementById('r-usd').value);
+  const precio=parseFloat(document.getElementById('r-precio').value);
+  const cop=parseFloat(document.getElementById('r-cop').value)||null;
+  const sats=parseInt(document.getElementById('r-sats').value)||null;
+  const nota=document.getElementById('r-nota').value.trim();
+  if (!fecha||!usd||usd<=0||!precio||precio<=0) { toast('Completa fecha, USD y precio.'); return; }
+  const tokens=usd/precio;
+  const {error}=await sb.from('compras').insert({id:Date.now(),user_id:currentUser.id,cripto:activeCrypto,fecha,usd,precio,tokens,cop,sats,nota});
+  if (error) { toast('Error al guardar.'); return; }
+  document.getElementById('r-usd').value='';
+  document.getElementById('r-precio').value='';
+  document.getElementById('r-cop').value='';
+  document.getElementById('r-sats').value='';
+  document.getElementById('r-nota').value='';
+  toast('Compra registrada ✓');
+}
+
+async function delCompra(id) {
+  if (!confirm('¿Eliminar esta compra?')) return;
+  await sb.from('compras').delete().eq('id',id).eq('user_id',currentUser.id);
+  renderHistorial();
+}
+
+async function renderHistorial() {
+  const el=document.getElementById('list-compras');
+  el.innerHTML='<div class="empty">cargando...</div>';
+  const {data,error}=await sb.from('compras').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto).order('fecha',{ascending:false});
+  if (error||!data||!data.length) { el.innerHTML='<div class="empty">sin compras para '+activeCrypto+'.</div>'; return; }
+  const cp=localPrices[activeCrypto]||0;
+  el.innerHTML=data.map(e=>{
+    const pnl=cp?(e.tokens*cp-e.usd):null;
+    const pnlPct=pnl!==null?(pnl/e.usd*100):null;
+    const cls=pnl!==null?(pnl>=0?'green':'red'):'';
+    const pnlStr=pnl!==null?`<div class="entry-pnl ${cls}">${pnl>=0?'+':''}${fmtU(pnl)} (${pnlPct>=0?'+':''}${fmt(pnlPct,1)}%)</div>`:'';
+    return `<div class="entry"><div>
+      <div class="entry-date">${e.fecha}${e.nota?' · '+e.nota:''}</div>
+      <div class="entry-main">${fmtU(e.usd)}</div>
+      <div class="entry-sub">${fmt(e.tokens,8)} ${activeCrypto} @ ${fmtU(e.precio)}${e.cop?' · COP '+fmt(e.cop,0):''}${e.sats?' · '+Number(e.sats).toLocaleString()+' sats':''}</div>
+      ${pnlStr}
+    </div><button class="btn-del" onclick="delCompra(${e.id})">&#215;</button></div>`;
+  }).join('');
+}
+
+async function calcVentaCant() {
+  const pct=parseFloat(document.getElementById('v-pct').value);
+  if (!pct||isNaN(pct)) return;
+  const {data:c}=await sb.from('compras').select('tokens').eq('user_id',currentUser.id).eq('cripto',activeCrypto);
+  const {data:v}=await sb.from('ventas').select('cant').eq('user_id',currentUser.id).eq('cripto',activeCrypto);
+  const total=(c||[]).reduce((s,x)=>s+x.tokens,0);
+  const vendidos=(v||[]).reduce((s,x)=>s+x.cant,0);
+  document.getElementById('v-cant').value=((pct/100)*(total-vendidos)).toFixed(8);
+}
+
+async function addVenta() {
+  const fecha=document.getElementById('v-fecha').value;
+  const cant=parseFloat(document.getElementById('v-cant').value);
+  const precio=parseFloat(document.getElementById('v-precio').value);
+  const nota=document.getElementById('v-nota').value.trim();
+  if (!fecha||!cant||cant<=0||!precio||precio<=0) { toast('Completa fecha, cantidad y precio.'); return; }
+  const {error}=await sb.from('ventas').insert({id:Date.now(),user_id:currentUser.id,cripto:activeCrypto,fecha,cant,precio,usd_obtenidos:cant*precio,nota});
+  if (error) { toast('Error al guardar.'); return; }
+  document.getElementById('v-cant').value='';
+  document.getElementById('v-pct').value='';
+  document.getElementById('v-precio').value='';
+  document.getElementById('v-nota').value='';
+  toast('Venta registrada ✓');
+  renderVentas();
+}
+
+async function delVenta(id) {
+  if (!confirm('¿Eliminar esta venta?')) return;
+  await sb.from('ventas').delete().eq('id',id).eq('user_id',currentUser.id);
+  renderVentas();
+}
+
+async function renderVentas() {
+  const el=document.getElementById('list-ventas');
+  el.innerHTML='<div class="empty">cargando...</div>';
+  const {data,error}=await sb.from('ventas').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto).order('fecha',{ascending:false});
+  if (error||!data||!data.length) { el.innerHTML='<div class="empty">sin ventas para '+activeCrypto+'.</div>'; return; }
+  const total=data.reduce((s,x)=>s+x.usd_obtenidos,0);
+  el.innerHTML=data.map(e=>`<div class="entry"><div>
+    <div class="entry-date">${e.fecha}${e.nota?' · '+e.nota:''}</div>
+    <div class="entry-main">${fmtU(e.usd_obtenidos)}</div>
+    <div class="entry-sub">${fmt(e.cant,8)} ${activeCrypto} @ ${fmtU(e.precio)}</div>
+  </div><button class="btn-del" onclick="delVenta(${e.id})">&#215;</button></div>`).join('')
+  +`<div style="padding-top:10px;font-size:13px;font-family:'DM Mono',monospace;color:var(--green)">total obtenido: ${fmtU(total)}</div>`;
+}
+
+async function renderResumen() {
+  const {data:c}=await sb.from('compras').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto);
+  const {data:v}=await sb.from('ventas').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto);
+  const compras=c||[]; const ventas=v||[];
+  const totalUSD=compras.reduce((s,x)=>s+x.usd,0);
+  const totalTokens=compras.reduce((s,x)=>s+x.tokens,0);
+  const totalVendidos=ventas.reduce((s,x)=>s+x.cant,0);
+  const totalUSDVentas=ventas.reduce((s,x)=>s+x.usd_obtenidos,0);
+  const saldo=Math.max(0,totalTokens-totalVendidos);
+  const precioPromed=totalTokens>0?totalUSD/totalTokens:0;
+  const cp=localPrices[activeCrypto]||0;
+  const valorActual=cp?saldo*cp:null;
+  const profit=valorActual!==null?(valorActual-totalUSD+totalUSDVentas):null;
+  const profitPct=profit!==null&&totalUSD>0?(profit/totalUSD*100):null;
+  document.getElementById('metrics-grid').innerHTML=`
+    <div class="metric"><div class="metric-label">total invertido</div><div class="metric-value accent">${fmtU(totalUSD)}</div></div>
+    <div class="metric"><div class="metric-label">${activeCrypto} acumulado</div><div class="metric-value">${fmt(totalTokens,6)}</div></div>
+    <div class="metric"><div class="metric-label">precio prom. DCA</div><div class="metric-value">${fmtU(precioPromed,0)}</div></div>
+    <div class="metric"><div class="metric-label">saldo en cartera</div><div class="metric-value">${fmt(saldo,6)}</div></div>
+    <div class="metric"><div class="metric-label">valor actual</div><div class="metric-value">${valorActual!==null?fmtU(valorActual):'—'}</div></div>
+    <div class="metric"><div class="metric-label">USD por ventas</div><div class="metric-value">${fmtU(totalUSDVentas)}</div></div>
+    <div class="metric"><div class="metric-label">profit total</div><div class="metric-value ${profit!==null?(profit>=0?'green':'red'):''}">${profit!==null?((profit>=0?'+':'')+fmtU(profit)):'—'}</div></div>
+    <div class="metric"><div class="metric-label">retorno</div><div class="metric-value ${profitPct!==null?(profitPct>=0?'green':'red'):''}">${profitPct!==null?((profitPct>=0?'+':'')+fmt(profitPct,1)+'%'):'—'}</div></div>`;
+  document.getElementById('resumen-detail').innerHTML=`<div class="card-title">detalle ${activeCrypto}</div><table class="detail-table">
+    <tr><td>num. compras</td><td>${compras.length}</td></tr>
+    <tr><td>num. ventas</td><td>${ventas.length}</td></tr>
+    <tr><td>tokens vendidos</td><td>${fmt(totalVendidos,8)}</td></tr>
+    ${cp?`<tr><td>precio actual</td><td>${fmtU(cp)}</td></tr>`:''}
+    ${cp&&precioPromed>0?`<tr><td>múltiplo vs DCA</td><td>${fmt(cp/precioPromed,2)}x</td></tr>`:''}
+  </table>`;
+}
+
+function renderConfig() {
+  document.getElementById('list-cryptos').innerHTML=cryptos.map(c=>`
+    <div class="crypto-item"><div><div class="crypto-symbol">${c}</div><div class="crypto-name">${cryptoNames[c]||''}</div></div>
+    ${cryptos.length>1?`<button class="btn-del" onclick="removeCrypto('${c}')">&#215;</button>`:''}</div>`).join('');
+}
+
+function addCrypto() {
+  const sym=document.getElementById('new-symbol').value.trim().toUpperCase();
+  const name=document.getElementById('new-name').value.trim();
+  if (!sym) { toast('Ingresa el símbolo.'); return; }
+  if (cryptos.includes(sym)) { toast('Ya existe.'); return; }
+  cryptos.push(sym); cryptoNames[sym]=name||sym;
+  document.getElementById('new-symbol').value='';
+  document.getElementById('new-name').value='';
+  saveCryptos(); renderChips(); renderConfig();
+  toast(sym+' agregado ✓');
+}
+
+function removeCrypto(c) {
+  if (!confirm('¿Eliminar '+c+'?')) return;
+  cryptos=cryptos.filter(x=>x!==c); delete cryptoNames[c];
+  if (activeCrypto===c) activeCrypto=cryptos[0];
+  saveCryptos(); renderChips(); renderConfig();
+}
+
+async function exportCSV() {
+  const {data:c}=await sb.from('compras').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto).order('fecha',{ascending:false});
+  const {data:v}=await sb.from('ventas').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto).order('fecha',{ascending:false});
+  let csv='COMPRAS '+activeCrypto+'\nFecha,USD gastados,Precio COP,Precio USD,Tokens,Satoshis,Nota\n';
+  (c||[]).forEach(e=>csv+=`${e.fecha},${e.usd},${e.cop||''},${e.precio},${e.tokens},${e.sats||''},${e.nota||''}\n`);
+  csv+='\nVENTAS '+activeCrypto+'\nFecha,Tokens vendidos,Precio USD,USD obtenidos,Nota\n';
+  (v||[]).forEach(e=>csv+=`${e.fecha},${e.cant},${e.precio},${e.usd_obtenidos},${e.nota||''}\n`);
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='dca_'+activeCrypto+'_'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  toast('CSV exportado ✓');
+}
+
+sb.auth.onAuthStateChange((event,session)=>{
+  if (session?.user) showApp(session.user);
+  else showAuthScreen();
+});
+</script>
+</body>
+</html>
