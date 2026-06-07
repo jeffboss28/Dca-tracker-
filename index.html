@@ -132,6 +132,23 @@ body { padding-bottom: 80px; }
   </div>
 </div>
 
+<div id="reset-screen" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem">
+  <div class="auth-card">
+    <div class="auth-title">DCA TRACKER</div>
+    <div class="auth-sub">nueva contraseña</div>
+    <div class="auth-field">
+      <label>nueva contraseña</label>
+      <input type="password" id="reset-pass" placeholder="mínimo 6 caracteres">
+    </div>
+    <div class="auth-field">
+      <label>confirmar contraseña</label>
+      <input type="password" id="reset-pass2" placeholder="repite la contraseña">
+    </div>
+    <div class="auth-error" id="reset-msg"></div>
+    <button class="auth-btn" onclick="doResetPassword()">guardar contraseña</button>
+  </div>
+</div>
+
 <div id="app-screen" style="display:none">
   <div class="header">
     <div><div class="header-title">DCA TRACKER</div><div class="header-sub">jeffboss</div></div>
@@ -164,23 +181,22 @@ body { padding-bottom: 80px; }
             <div class="hint">💵 Cuántos dólares invertiste</div>
           </div>
           <div class="field">
-            <label>precio COP</label>
-            <input type="number" id="r-cop" placeholder="opcional" step="1" min="0">
-            <div class="hint">🇨🇴 Tasa de cambio del día (opcional)</div>
+            <label>COP gastados</label>
+            <input type="number" id="r-cop" placeholder="opcional" step="1" min="0" oninput="calcPrecioDesdeSats()">
+            <div class="hint">🇨🇴 Si compraste en pesos, ingresa el valor aquí. Con sats se calcula el precio BTC automáticamente</div>
           </div>
         </div>
         <div class="field">
           <label>satoshis recibidos</label>
           <input type="number" id="r-sats" placeholder="ej: 118000" step="1" min="0" oninput="calcPrecioDesdeSats()">
-          <div class="hint">⚡ Cantidad de sats que recibiste. Llena este campo primero y el precio se calcula solo</div>
+          <div class="hint">⚡ Cantidad de sats que recibiste. Solo números enteros, sin puntos ni comas. Ej: 118000. Llena este campo primero y el precio se calcula solo</div>
         </div>
         <div class="field">
           <label>precio <span id="r-sym-label">BTC</span> en compra (USD)</label>
           <div class="price-row">
             <input type="number" id="r-precio" placeholder="se calcula con sats o ingresa manual" step="0.01" min="0">
-            <button class="btn-sm" onclick="useLivePrice()">usar actual</button>
           </div>
-          <div class="hint">📈 Se calcula automático si ingresaste los sats. Si no, usa "usar actual" o escríbelo manualmente</div>
+          <div class="hint">📈 Se calcula automático desde USD+sats o COP+sats. También puedes escribirlo manualmente</div>
         </div>
         <div class="field">
           <label>nota</label>
@@ -534,6 +550,14 @@ async function renderVentas() {
 }
 
 async function renderResumen() {
+  if (!localPrices[activeCrypto]) {
+    try {
+      const r = await fetch('https://api.coinbase.com/v2/prices/'+activeCrypto+'-USD/spot');
+      const d = await r.json();
+      localPrices[activeCrypto] = parseFloat(d.data.amount);
+      updatePriceDisplay();
+    } catch(e) {}
+  }
   const {data:c}=await sb.from('compras').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto);
   const {data:v}=await sb.from('ventas').select('*').eq('user_id',currentUser.id).eq('cripto',activeCrypto);
   const compras=c||[]; const ventas=v||[];
@@ -603,9 +627,31 @@ async function exportCSV() {
   toast('CSV exportado ✓');
 }
 
-sb.auth.onAuthStateChange((event,session)=>{
-  if (session?.user) showApp(session.user);
-  else showAuthScreen();
+async function doResetPassword() {
+  const pass = document.getElementById('reset-pass').value;
+  const pass2 = document.getElementById('reset-pass2').value;
+  const el = document.getElementById('reset-msg');
+  el.style.color = 'var(--red)'; el.textContent = '';
+  if (pass.length < 6) { el.textContent = 'Mínimo 6 caracteres.'; return; }
+  if (pass !== pass2) { el.textContent = 'Las contraseñas no coinciden.'; return; }
+  const {error} = await sb.auth.updateUser({password: pass});
+  if (error) { el.textContent = 'Error al actualizar. Intenta de nuevo.'; return; }
+  el.style.color = 'var(--green)';
+  el.textContent = '¡Contraseña actualizada! Redirigiendo...';
+  setTimeout(() => { document.getElementById('reset-screen').style.display='none'; showAuthScreen(); }, 2000);
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app-screen').style.display='none';
+    document.getElementById('reset-screen').style.display='flex';
+  } else if (session?.user) {
+    showApp(session.user);
+  } else {
+    showAuthScreen();
+  }
 });
 </script>
 </body>
